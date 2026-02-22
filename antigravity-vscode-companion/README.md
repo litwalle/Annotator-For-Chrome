@@ -1,20 +1,45 @@
-# Annotator - for VS Code
+# Annotator for Antigravity
 
-This is the companion extension for the **Annotator - for Chrome** browser extension. It enables seamless image and text injection from your browser directly into your IDE.
+**Antigravity Annotator** is a powerful productivity tool. It bridges the gap between your web browser and the **Antigravity** macOS desktop application, allowing you to capture, annotate, and instantly teleport screenshots and context directly into your Antigravity chat.
 
-## 快速上手指南 (Quick Start)
+This is the companion IDE extension. Because modern browsers restrict direct system-level execution, this extension runs a secure local background daemon inside your IDE (VS Code, Cursor, VSCodium, etc.) to handle the routing.
 
-为了让截图和标注能正确发送到当前打开的 VS Code 窗口中，你需要同时安装并启用浏览器端和 IDE 端的两个插件。具体步骤如下：
+---
 
-1. **第一步：安装 Chrome 扩展**
-   在 Chrome 浏览器中安装并固定 "Annotator - for Chrome" 扩展。
+## 🚀 Quick Start Guide
 
-2. **第二步：安装 VS Code 插件**
-   在 VS Code 插件市场搜索并安装 `"Annotator - for VS Code"` (包名为 `annotator-for-vscode`)。
+To enable seamless image and text injection from your browser into the Antigravity app, please follow these steps:
 
-3. **第三步：开始通信**
-   **只有当上述两端插件都安装并启用后，完整的通信链路才会建立。**
-   
-   使用方法：在浏览器扩展里截取网页、框选或输入文字后，点击 "Add to Antigravity"（或发送按钮）。屏幕截图和对应的内容会被通过本地网桥（端口 3001）自动注入到你当前在 VS Code 里打开、且光标所在的文件中。
+### Step 1: Install the Chrome Extension First
+1. Open the [Chrome Web Store](https://chrome.google.com/webstore) in your Google Chrome or Edge browser.
+2. Search for and install the **"Annotator - for Chrome"** extension.
+3. **Pin** the extension to your browser toolbar for quick access.
 
-> **提示:** 你可以通过 VS Code 命令面板 (Cmd+Shift+P / Ctrl+Shift+P) 搜索 `Restart Annotator Server` 来手动重启本地通信服务。
+### Step 2: Install this Companion Extension in your IDE
+1. Open your compatible IDE (e.g., VS Code, VSCodium, Cursor).
+2. Go to the Extensions Marketplace (or Open VSX Registry) and search for **"Annotator for Antigravity"**.
+3. Click **Install**.
+4. *(Optional but recommended)* Reload your IDE window to ensure the background local daemon starts correctly.
+
+### Step 3: Start Annotating & Injecting!
+The complete communication bridge is now established.
+1. Navigate to any webpage in your Chrome browser.
+2. Click the **Annotator** icon in your browser toolbar to take a full-page screenshot.
+3. Use the built-in annotation tools to draw, highlight, comment, or write text.
+4. **Make sure your IDE is running in the background**, so the local bridge is active.
+5. In the browser annotator, click the **"Add to Antigravity"** button.
+6. The extension will automatically wake up your **Antigravity desktop app**, bring it to the front, and inject the annotated screenshot and prompt right into your chat!
+
+---
+
+## ⚠️ Important Precautions & Usage Tips
+
+* **macOS Only**: This specific routing mechanism relies on AppleScript (`tell application "Antigravity"`), which means it is designed specifically for macOS users running the Antigravity desktop client.
+* **Keep your IDE open**: The local receiver server (`http://localhost:3001`) only runs when your IDE is open. If you close your IDE, the browser extension will temporarily lose its bridge to the Antigravity app.
+* **Server Status**: If for any reason the connection drops, you can restart the local server manually:
+  * Open the Command Palette in your IDE (`Cmd+Shift+P`).
+  * Type and execute: `Restart Annotator Server`.
+
+---
+
+**Enjoy a frictionless feedback loop and turbocharge your workflow in Antigravity!**

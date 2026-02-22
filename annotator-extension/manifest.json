@@ -8,9 +8,6 @@
     "scripting",
     "clipboardWrite"
   ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
   "action": {
     "default_title": "Annotate Page",
     "default_icon": {

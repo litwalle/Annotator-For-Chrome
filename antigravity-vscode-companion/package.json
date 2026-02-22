@@ -1,13 +1,13 @@
 {
-    "name": "annotator-for-vscode",
-    "displayName": "Annotator - for VS Code",
+    "name": "antigravity",
+    "displayName": "Annotator for Antigravity",
     "description": "Companion extension for Antigravity browser annotator. Enables seamless image and text injection from browser to IDE.",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "icon": "icon.png",
-    "publisher": "antigravity",
+    "publisher": "litwalle",
     "repository": {
         "type": "git",
-        "url": "https://github.com/yourusername/antigravity-vscode-companion"
+        "url": "https://github.com/litwalle/Antigravity-Annotator-1.0"
     },
     "license": "MIT",
     "engines": {
