@@ -1,11 +1,17 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Antigravity Annotator - Privacy Policy</title>
+  <title>Antigravity Annotator - Introduction & Privacy</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       line-height: 1.8;
@@ -15,11 +21,36 @@
       padding: 40px 20px;
       background: #fafafa;
     }
-    h1 { font-size: 28px; margin-bottom: 8px; color: #111; }
-    .subtitle { color: #666; margin-bottom: 32px; font-size: 14px; }
-    h2 { font-size: 20px; margin-top: 32px; margin-bottom: 12px; color: #222; }
-    p, li { margin-bottom: 12px; font-size: 15px; }
-    ul { padding-left: 24px; }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      color: #111;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 32px;
+      font-size: 14px;
+    }
+
+    h2 {
+      font-size: 20px;
+      margin-top: 32px;
+      margin-bottom: 12px;
+      color: #222;
+    }
+
+    p,
+    li {
+      margin-bottom: 12px;
+      font-size: 15px;
+    }
+
+    ul {
+      padding-left: 24px;
+    }
+
     .highlight {
       background: #e8f5e9;
       border-left: 4px solid #4caf50;
@@ -27,64 +58,94 @@
       border-radius: 4px;
       margin: 16px 0;
     }
-    a { color: #1a73e8; }
-    footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid #ddd; color: #999; font-size: 13px; }
+
+    a {
+      color: #1a73e8;
+    }
+
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid #ddd;
+      color: #999;
+      font-size: 13px;
+    }
   </style>
 </head>
+
 <body>
 
-<h1>Antigravity Annotator — Privacy Policy</h1>
-<p class="subtitle">Last updated: February 21, 2026</p>
+  <h1>Antigravity Annotator — Introduction & Privacy Policy</h1>
+  <p class="subtitle">Last updated: February 22, 2026</p>
 
-<div class="highlight">
-  <strong>Summary:</strong> Antigravity Annotator does not collect, store, or transmit any personal data to external servers. All data stays on your local machine.
-</div>
+  <h2>Product Introduction</h2>
+  <p><strong>Antigravity Annotator</strong> is a browser extension designed to let you capture a full screenshot of the
+    current webpage, crop and annotate it with drawing tools, highlights, comments, and text, then seamlessly send the
+    result—along with context prompts—directly to your IDE. Built for designers and developers who need a fast, local
+    feedback loop between the browser and their development environment.</p>
 
-<h2>1. What Data We Access</h2>
-<p>When you click the extension icon, Antigravity Annotator:</p>
-<ul>
-  <li>Captures a screenshot of the currently visible browser tab using the Chrome <code>captureVisibleTab</code> API.</li>
-  <li>Injects a content script into the active tab to display an annotation overlay, allowing you to draw and add comments on the screenshot.</li>
-</ul>
+  <div class="highlight">
+    <strong>Privacy Summary:</strong> Antigravity Annotator does not collect, store, or transmit any personal data to
+    external servers. All data stays on your local machine.
+  </div>
 
-<h2>2. How Data Is Used</h2>
-<p>The captured screenshot and your annotations are used solely for the purpose of enabling the annotation workflow. Specifically:</p>
-<ul>
-  <li>The screenshot image is held in memory within the browser tab and is never saved to disk or uploaded to any remote server.</li>
-  <li>When you choose to "Send to IDE", the annotated data is sent to a <strong>local server running on your own machine</strong> (typically <code>localhost:3001</code>). This is your local development environment — no data leaves your computer.</li>
-</ul>
+  <h2>1. What Data We Access</h2>
+  <p>When you click the extension icon, Antigravity Annotator:</p>
+  <ul>
+    <li>Captures a screenshot of the currently visible browser tab using the Chrome <code>captureVisibleTab</code> API.
+    </li>
+    <li>Injects a content script into the active tab to display an annotation overlay, allowing you to draw and add
+      comments on the screenshot.</li>
+  </ul>
 
-<h2>3. Data Collection</h2>
-<p>Antigravity Annotator does <strong>not</strong>:</p>
-<ul>
-  <li>Collect any personal information (name, email, browsing history, etc.)</li>
-  <li>Use cookies or any tracking technologies</li>
-  <li>Send analytics or telemetry data to any third party</li>
-  <li>Store any data beyond the current browser session</li>
-</ul>
+  <h2>2. How Data Is Used</h2>
+  <p>The captured screenshot and your annotations are used solely for the purpose of enabling the annotation workflow.
+    Specifically:</p>
+  <ul>
+    <li>The screenshot image is held in memory within the browser tab and is never saved to disk or uploaded to any
+      remote server.</li>
+    <li>When you choose to "Send to IDE", the annotated data is sent to a <strong>local server running on your own
+        machine</strong> (typically <code>localhost:3001</code>). This is your local development environment — no data
+      leaves your computer.</li>
+  </ul>
 
-<h2>4. Permissions Explained</h2>
-<ul>
-  <li><strong>activeTab:</strong> Required to capture a screenshot of the tab you are currently viewing when you click the extension icon.</li>
-  <li><strong>scripting:</strong> Required to inject the annotation overlay UI into the active tab.</li>
-  <li><strong>host_permissions (&lt;all_urls&gt;):</strong> Required so the extension can work on any webpage you wish to annotate. The extension does not read or modify page content — it only overlays the annotation UI on top.</li>
-</ul>
+  <h2>3. Data Collection</h2>
+  <p>Antigravity Annotator does <strong>not</strong>:</p>
+  <ul>
+    <li>Collect any personal information (name, email, browsing history, etc.)</li>
+    <li>Use cookies or any tracking technologies</li>
+    <li>Send analytics or telemetry data to any third party</li>
+    <li>Store any data beyond the current browser session</li>
+  </ul>
 
-<h2>5. Third-Party Services</h2>
-<p>This extension does not integrate with any third-party services, advertising networks, or analytics platforms.</p>
+  <h2>4. Permissions Explained</h2>
+  <ul>
+    <li><strong>activeTab:</strong> Required to capture a screenshot of the tab you are currently viewing when you click
+      the extension icon.</li>
+    <li><strong>scripting:</strong> Required to inject the annotation overlay UI into the active tab.</li>
+    <li><strong>host_permissions (&lt;all_urls&gt;):</strong> Required so the extension can work on any webpage you wish
+      to annotate. The extension does not read or modify page content — it only overlays the annotation UI on top.</li>
+  </ul>
 
-<h2>6. Data Security</h2>
-<p>Since all data remains on your local machine and is never transmitted to external servers, there is minimal risk of data exposure. The local communication between the extension and your IDE uses standard HTTP on localhost.</p>
+  <h2>5. Third-Party Services</h2>
+  <p>This extension does not integrate with any third-party services, advertising networks, or analytics platforms.</p>
 
-<h2>7. Changes to This Policy</h2>
-<p>If we make changes to this privacy policy, we will update the "Last updated" date above. Continued use of the extension after changes constitutes acceptance of the updated policy.</p>
+  <h2>6. Data Security</h2>
+  <p>Since all data remains on your local machine and is never transmitted to external servers, there is minimal risk of
+    data exposure. The local communication between the extension and your IDE uses standard HTTP on localhost.</p>
 
-<h2>8. Contact</h2>
-<p>If you have questions about this privacy policy, please open an issue on our GitHub repository or contact us at the email provided on the Chrome Web Store listing.</p>
+  <h2>7. Changes to This Policy</h2>
+  <p>If we make changes to this privacy policy, we will update the "Last updated" date above. Continued use of the
+    extension after changes constitutes acceptance of the updated policy.</p>
 
-<footer>
-  &copy; 2026 Antigravity Project. All rights reserved.
-</footer>
+  <h2>8. Contact</h2>
+  <p>If you have questions about this privacy policy, please open an issue on our GitHub repository or contact us at the
+    email provided on the Chrome Web Store listing.</p>
+
+  <footer>
+    &copy; 2026 Antigravity Project. All rights reserved.
+  </footer>
 
 </body>
+
 </html>

@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Antigravity Annotator",
+  "name": "Annotator - for Chrome",
   "version": "1.0",
   "description": "Capture page screenshot, annotate with draws/comments, and send to IDE.",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "<all_urls>"

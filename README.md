@@ -15,10 +15,12 @@ Antigravity Annotator is a browser extension that lets you capture a full screen
 ## Features
 
 - **Screenshot Capture** — One-click capture of the visible webpage
+- **Crop Tool** — Crop the screenshot to focus on specific areas
 - **Freehand Drawing** — Draw freely with customizable neon colors
-- **Rectangle Highlight** — Highlight areas with semi-transparent dashed rectangles
+- **Highlight** — Highlight areas with semi-transparent rectangles
 - **Comments** — Create comment boxes with pointer lines for contextual feedback
 - **Text Annotations** — Place text directly on the screenshot
+- **Image & Prompt Integration** — Seamlessly copy annotated images and generated context prompts
 - **Send to IDE** — Push annotated screenshots to a local API endpoint for IDE integration
 - **Keyboard Shortcuts** — Full shortcut support for fast workflows
 - **Retina Support** — Full-resolution rendering on high-DPI displays

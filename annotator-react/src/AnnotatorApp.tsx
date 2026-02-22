@@ -2,11 +2,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import {
     Pencil, Square, MessageSquare, Type,
-    Undo2, X, Send, Loader2, Check, Eraser
+    Undo2, X, Send, Loader2, Check, Eraser, Copy, Crop
 } from 'lucide-react'
 
 // ---- 类型定义 ----
-type ToolId = 'draw' | 'rect' | 'comment' | 'text'
+type ToolId = 'draw' | 'rect' | 'comment' | 'text' | 'crop'
 type SendStatus = 'idle' | 'sending' | 'success' | 'error'
 
 interface CommentState {
@@ -24,6 +24,7 @@ const TOOLS: { id: ToolId; label: string; shortcut?: string; Icon: React.Element
     { id: 'rect', label: 'Highlight area', shortcut: 'H', Icon: Square },
     { id: 'comment', label: 'Add comment', shortcut: 'C', Icon: MessageSquare },
     { id: 'text', label: 'Add text', shortcut: 'T', Icon: Type },
+    { id: 'crop', label: 'Crop image', shortcut: 'K', Icon: Crop },
 ]
 
 const COLORS = [
@@ -44,6 +45,7 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
     const historyRef = useRef<ImageData[]>([])
     const isDrawingRef = useRef(false)
     const startPosRef = useRef({ x: 0, y: 0 })
+    const startCropRectRef = useRef<{ x: number, y: number, w: number, h: number } | null>(null)
     const commentRectRef = useRef<{ x: number; y: number; w: number; h: number; color: string } | null>(null)
     // scale: Canvas 原始像素尺寸 → 屏幕显示的缩放比
     const scaleRef = useRef(1)
@@ -57,7 +59,18 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
     const [commentState, setCommentState] = useState<CommentState>({ visible: false, x: 0, y: 0, mode: 'comment' })
     const [commentText, setCommentText] = useState('')
     const [sendStatus, setSendStatus] = useState<SendStatus>('idle')
+    const [hasSentPrompt, setHasSentPrompt] = useState(false)
+    const [hasCopiedPrompt, setHasCopiedPrompt] = useState(false)
+    const [showGuide, setShowGuide] = useState(false)
     const [activeColor, setActiveColor] = useState(COLORS[5]) // 默认荧光粉
+    const [cropRect, setCropRect] = useState<{ x: number, y: number, w: number, h: number } | null>(null)
+    const [isCropActive, setIsCropActive] = useState(false) // 是否在裁剪模式（遮罩是否显示）
+    const [isCropSelected, setIsCropSelected] = useState(false) // 是否选中了裁剪框（把手是否常驻）
+    const [isHoveringHandle, setIsHoveringHandle] = useState(false) // 鼠标是否经过边缘/把手（临时显示）
+    const [isResizing, setIsResizing] = useState<string | null>(null)
+    const [isMovingCrop, setIsMovingCrop] = useState(false)
+
+    const TEXT_PROMPT = "Please modify based on the information in the screenshot."
 
     // ---- 入场动画：双 rAF 确保初始 opacity:0 先绘制，再触发 transition ----
     useEffect(() => {
@@ -109,7 +122,11 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
         if (stack.length > 0) canvas.getContext('2d')!.putImageData(stack[stack.length - 1], 0, 0)
     }
     function undo() {
-        if (commentState.visible) { closeComment(); restoreLastState(); return }
+        if (commentState.visible) {
+            closeComment()
+            restoreLastState()
+            return
+        }
         const stack = historyRef.current
         if (stack.length > 1) {
             stack.pop()
@@ -122,9 +139,27 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
         const ctx = canvas.getContext('2d')!
         ctx.putImageData(bgSnapshotRef.current, 0, 0)
         historyRef.current = [ctx.getImageData(0, 0, canvas.width, canvas.height)]
+        setCropRect(null)
     }
     function changeTool(t: ToolId) {
         if (commentState.visible) { closeComment(); restoreLastState() }
+        if (t === 'crop') {
+            const nextActive = !isCropActive
+            setIsCropActive(nextActive)
+            setIsCropSelected(nextActive) // 激活模式时默认选中以显示把手
+            if (nextActive) {
+                setTool('crop')
+            } else {
+                setCropRect(null)
+                if (tool === 'crop') setTool('draw')
+            }
+            return
+        }
+        // 切换到其他工具时，默认取消选中把手，仅保留裁剪模式
+        if (isCropActive) {
+            setIsCropSelected(false)
+            setIsHoveringHandle(false)
+        }
         setTool(t)
     }
     const handleClose = useCallback(() => {
@@ -146,7 +181,7 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
         const s = scaleRef.current
         // 字体大小按 1/scale 放大，保证视觉上约 17px 的显示大小
         const fontSize = Math.round(17 / s)
-        ctx.font = `500 ${fontSize}px -apple-system, 'Inter', sans-serif`
+        ctx.font = `400 ${fontSize}px -apple-system, 'Inter', sans-serif`
         ctx.textAlign = 'left'; ctx.textBaseline = 'top'
         text.split('\n').forEach((line, i) => {
             const ty = y + i * (fontSize + Math.round(5 / s))
@@ -168,6 +203,8 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
         if (!text) { closeComment(); restoreLastState(); return }
         const canvas = canvasRef.current!; const ctx = canvas.getContext('2d')!
 
+        restoreLastState()
+
         if (commentState.mode === 'text') {
             const { x: tx, y: ty } = toCanvas(commentState.x, commentState.y)
             drawStrokedText(canvas, text, tx, ty)
@@ -178,7 +215,7 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
             drawCommentRect(ctx, rx, ry, rw, rh, color)
             const s = scaleRef.current
             const fontSize = Math.round(17 / s)
-            ctx.font = `500 ${fontSize}px -apple-system, 'Inter', sans-serif`
+            ctx.font = `400 ${fontSize}px -apple-system, 'Inter', sans-serif`
             const lines = text.split('\n')
             const maxW = Math.max(...lines.map(l => ctx.measureText(l).width))
             let textX = rx + rw + Math.round(14 / s)
@@ -198,8 +235,63 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
     // ---- Canvas 鼠标事件（坐标统一转换到 Canvas 坐标系）----
     const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
         if (commentState.visible) { closeComment(); restoreLastState(); return }
-        isDrawingRef.current = true
         const { x: cx, y: cy } = toCanvas(e.clientX, e.clientY)
+
+        // 1. 优先级最高：如果能感应到边缘或把手，则进入 Resize
+        if (isCropActive && cropRect) {
+            const s = scaleRef.current
+            const { x, y, w, h } = cropRect
+            const margin = 12 / s
+            const onLeft = Math.abs(cx - x) < margin && cy >= y - margin && cy <= y + h + margin
+            const onRight = Math.abs(cx - (x + w)) < margin && cy >= y - margin && cy <= y + h + margin
+            const onTop = Math.abs(cy - y) < margin && cx >= x - margin && cx <= x + w + margin
+            const onBottom = Math.abs(cy - (y + h)) < margin && cx >= x - margin && cx <= x + w + margin
+
+            let resizeDir = ''
+            if (onLeft && onTop) resizeDir = 'nw'
+            else if (onRight && onTop) resizeDir = 'ne'
+            else if (onLeft && onBottom) resizeDir = 'sw'
+            else if (onRight && onBottom) resizeDir = 'se'
+            else if (onTop) resizeDir = 'n'
+            else if (onBottom) resizeDir = 's'
+            else if (onLeft) resizeDir = 'w'
+            else if (onRight) resizeDir = 'e'
+
+            // 如果点击了边缘（或者有把手常驻/即时Hover显示）
+            if (resizeDir && (isCropSelected || isHoveringHandle || onLeft || onRight || onTop || onBottom)) {
+                setIsResizing(resizeDir)
+                setIsCropSelected(true) // 点击边缘后把手常驻显示
+                return
+            }
+
+            // 2. 命中内部判定
+            if (cx > x && cx < x + w && cy > y && cy < y + h) {
+                if (tool === 'crop') {
+                    // 裁剪工具下：点击内部激活移动
+                    setIsMovingCrop(true)
+                    setIsCropSelected(true)
+                    startPosRef.current = { x: cx - x, y: cy - y }
+                    return
+                } else {
+                    // 非裁剪工具下：视为要在内部标注，取消把手常驻
+                    setIsCropSelected(false)
+                }
+            } else {
+                // 点击了外部区域
+                setIsCropSelected(false)
+            }
+        }
+
+        // 3. 开始执行具体工具动作
+        if (tool === 'crop') {
+            isDrawingRef.current = true
+            startPosRef.current = { x: cx, y: cy }
+            startCropRectRef.current = cropRect // 备份当前裁剪区
+            // 不立即重置 cropRect，避免单点黑底时的画面闪烁
+            return
+        }
+
+        isDrawingRef.current = true
         startPosRef.current = { x: cx, y: cy }
         const ctx = canvasRef.current!.getContext('2d')!
         ctx.beginPath(); ctx.moveTo(cx, cy)
@@ -207,15 +299,76 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
             const s = scaleRef.current
             ctx.lineWidth = 3 / s; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = activeColor
         }
-    }, [commentState.visible, tool, activeColor])
+    }, [commentState.visible, tool, activeColor, cropRect, isCropActive, isCropSelected, isHoveringHandle])
 
     const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        const { x: cx, y: cy } = toCanvas(e.clientX, e.clientY)
+        const s = scaleRef.current
+
+        // 边缘探测与光标反馈
+        if (isCropActive && !isResizing && !isMovingCrop && cropRect) {
+            const { x, y, w, h } = cropRect
+            const margin = 12 / s
+            const onLeft = Math.abs(cx - x) < margin && cy >= y - margin && cy <= y + h + margin
+            const onRight = Math.abs(cx - (x + w)) < margin && cy >= y - margin && cy <= y + h + margin
+            const onTop = Math.abs(cy - y) < margin && cx >= x - margin && cx <= x + w + margin
+            const onBottom = Math.abs(cy - (y + h)) < margin && cx >= x - margin && cx <= x + w + margin
+
+            let cursor = tool === 'crop' ? 'crosshair' : cursorMap[tool]
+            let isHovering = true
+
+            if (onLeft && onTop) cursor = 'nwse-resize'
+            else if (onRight && onTop) cursor = 'nesw-resize'
+            else if (onLeft && onBottom) cursor = 'nesw-resize'
+            else if (onRight && onBottom) cursor = 'nwse-resize'
+            else if (onTop || onBottom) cursor = 'ns-resize'
+            else if (onLeft || onRight) cursor = 'ew-resize'
+            else {
+                isHovering = false
+                if (tool === 'crop' && cx > x && cx < x + w && cy > y && cy < y + h) cursor = 'move'
+            }
+
+            // 更新临时 Hover 状态
+            if (isHovering !== isHoveringHandle) setIsHoveringHandle(isHovering)
+
+            // 只有在选中、Hover边缘、或工具是裁剪时，才主动覆盖光标
+            if (isHovering || isCropSelected || tool === 'crop') {
+                e.currentTarget.style.cursor = cursor
+                if (isHovering) return
+            }
+        }
+
+        if (isResizing && cropRect) {
+            const { x, y, w, h } = cropRect
+            let next = { ...cropRect }
+            if (isResizing.includes('e')) next.w = Math.max(40, cx - x)
+            if (isResizing.includes('w')) { const nw = x + w - cx; if (nw > 40) { next.x = cx; next.w = nw } else { next.x = x + w - 40; next.w = 40 } }
+            if (isResizing.includes('s')) next.h = Math.max(40, cy - y)
+            if (isResizing.includes('n')) { const nh = y + h - cy; if (nh > 40) { next.y = cy; next.h = nh } else { next.y = y + h - 40; next.h = 40 } }
+            setCropRect(next)
+            return
+        }
+
+        if (isMovingCrop && cropRect) {
+            setCropRect({ ...cropRect, x: cx - startPosRef.current.x, y: cy - startPosRef.current.y })
+            return
+        }
+
         if (!isDrawingRef.current) return
         const canvas = canvasRef.current!; const ctx = canvas.getContext('2d')!
         const { x: sx, y: sy } = startPosRef.current
-        const { x: cx, y: cy } = toCanvas(e.clientX, e.clientY)
         const dx = cx - sx, dy = cy - sy
-        const s = scaleRef.current
+
+        if (tool === 'crop') {
+            setCropRect({
+                x: Math.min(sx, cx),
+                y: Math.min(sy, cy),
+                w: Math.abs(dx),
+                h: Math.abs(dy)
+            })
+            return
+        }
+
         if (tool === 'draw') { ctx.lineTo(cx, cy); ctx.stroke() }
         else if (tool === 'rect' || tool === 'comment') {
             restoreLastState()
@@ -223,15 +376,34 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
             ctx.fillStyle = `${activeColor}1F`; ctx.fill() // 约 12% 透明度
             ctx.strokeStyle = activeColor; ctx.lineWidth = 3 / s; ctx.setLineDash([8 / s, 6 / s]); ctx.stroke(); ctx.setLineDash([])
         }
-    }, [tool, activeColor])
+    }, [tool, activeColor, isResizing, isMovingCrop, cropRect])
 
     const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        setIsResizing(null); setIsMovingCrop(false)
         if (!isDrawingRef.current) return
         isDrawingRef.current = false
         const canvas = canvasRef.current!; const ctx = canvas.getContext('2d')!
         const { x: sx, y: sy } = startPosRef.current
         const { x: cx, y: cy } = toCanvas(e.clientX, e.clientY)
         const dx = cx - sx, dy = cy - sy
+
+        if (tool === 'crop') {
+            const finalRect = {
+                x: Math.min(sx, cx),
+                y: Math.min(sy, cy),
+                w: Math.abs(dx),
+                h: Math.abs(dy)
+            }
+            if (finalRect.w < 5 || finalRect.h < 5) {
+                // 如果没有实际拖拽，只是单点，那就恢复刚才保存的裁剪框
+                setCropRect(startCropRectRef.current)
+            } else {
+                setCropRect(finalRect)
+                setIsCropSelected(true) // 重新画了一个框之后，把手应该是常驻显示的
+            }
+            return
+        }
+
         if (tool === 'draw' || tool === 'rect') {
             if (Math.abs(dx) > 2 || Math.abs(dy) > 2) saveState(ctx, canvas)
         } else if (tool === 'comment') {
@@ -240,11 +412,11 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
                 restoreLastState()
                 const rx = Math.min(sx, cx), ry = Math.min(sy, cy)
                 drawCommentRect(ctx, rx, ry, Math.abs(dx), Math.abs(dy), activeColor)
-                saveState(ctx, canvas)
                 // 输入框用屏幕坐标
                 openComment(Math.max(e.clientX, sx * scaleRef.current), Math.max(e.clientY, sy * scaleRef.current), 'comment')
             } else { restoreLastState() }
         } else if (tool === 'text') {
+            restoreLastState()
             openComment(e.clientX, e.clientY, 'text')
         }
     }, [tool, activeColor])
@@ -280,32 +452,128 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
         return () => document.removeEventListener('keydown', handler)
     }, [commentState.visible, handleClose])
 
-    // ---- 发送到 IDE ----
-    function sendToIDE() {
-        setSendStatus('sending')
-        chrome.runtime.sendMessage(
-            {
-                action: 'SEND_TO_IDE',
-                payload: {
-                    image: canvasRef.current!.toDataURL('image/png'),
-                    url: window.location.href,
-                    timestamp: new Date().toISOString(),
-                    devicePixelRatio: window.devicePixelRatio
-                }
-            },
-            (res) => {
-                if (chrome.runtime.lastError || !res?.success) { setSendStatus('error'); setTimeout(() => setSendStatus('idle'), 3000) }
-                else { setSendStatus('success'); setTimeout(() => setSendStatus('idle'), 2000) }
-            }
-        )
+    // ---- 获取导出图片 (处理裁剪) ----
+    async function getExportBlob(): Promise<Blob> {
+        const canvas = canvasRef.current;
+        if (!canvas) throw new Error("Canvas not ready");
+
+        if (cropRect) {
+            // 创建一个临时 canvas 来提取裁剪区域
+            const tempCanvas = document.createElement('canvas');
+            const { x, y, w, h } = cropRect;
+            tempCanvas.width = w;
+            tempCanvas.height = h;
+            const tempCtx = tempCanvas.getContext('2d')!;
+            tempCtx.drawImage(canvas, x, y, w, h, 0, 0, w, h);
+            return new Promise((resolve, reject) => {
+                tempCanvas.toBlob(b => b ? resolve(b) : reject(new Error("Cropped toBlob failed")), 'image/png');
+            });
+        }
+
+        return new Promise((resolve, reject) => {
+            canvas.toBlob((b: Blob | null) => {
+                if (b) resolve(b);
+                else reject(new Error("Canvas toBlob failed"));
+            }, 'image/png');
+        });
     }
 
-    const cursorMap: Record<ToolId, string> = { draw: 'crosshair', rect: 'crosshair', comment: 'cell', text: 'text' }
+    // ---- 发送到 IDE ----
+    async function sendToIDE() {
+        setSendStatus('sending')
+        try {
+            const canvas = canvasRef.current;
+            if (!canvas) throw new Error("Canvas not ready");
+
+            // 1. 获取图片 Blob (支持裁剪)
+            const blob = await getExportBlob();
+
+            // 2. 写入系统剪贴板 (Clipboard API 要求安全上下文，通常 content script 在原网页域执行，允许此操作)
+            await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+            ]);
+
+            // 3. 触发本地守护进程，执行自动粘贴。
+            // 由于安全沙盒限制（Mixed Content），在 HTTPS 内容页中无法直接 fetch http://localhost
+            // 我们改为让扩展的 Background Service Worker 替我们发请求
+            try {
+                const resp = await new Promise<{ success?: boolean }>((resolve) => {
+                    if (typeof chrome !== 'undefined' && chrome.runtime) {
+                        chrome.runtime.sendMessage(
+                            { action: 'TRIGGER_LOCAL_DAEMON', url: window.location.href, includePrompt: !hasSentPrompt },
+                            (response) => resolve(response || { success: false })
+                        );
+                    } else {
+                        resolve({ success: false });
+                    }
+                });
+
+                if (!resp || !resp.success) {
+                    throw new Error('Daemon returned error or not reachable');
+                }
+
+                if (!hasSentPrompt) {
+                    setHasSentPrompt(true);
+                    setHasCopiedPrompt(true); // 同时标记已复制过，避免后续 Copy 再带一遍
+                }
+            } catch (err) {
+                console.warn("未能连接到后台伴侣脚本，尝试退回 Deep Link 唤醒模式", err);
+                setShowGuide(true); // 此时触发引导弹窗
+                // 降级方案：退回到强制唤醒模式，使用普通的 antigravity:// 唤醒
+                window.location.href = `antigravity://`;
+            }
+            setSendStatus('success');
+            setTimeout(() => setSendStatus('idle'), 2000);
+        } catch (error) {
+            console.error("Failed to send to IDE via Clipboard/DeepLink:", error);
+            setSendStatus('error');
+            setTimeout(() => setSendStatus('idle'), 3000);
+        }
+    }
+
+    const [copyStatus, setCopyStatus] = useState<SendStatus>('idle');
+
+    // ---- 复制到剪贴板 ----
+    async function copyToClipboard() {
+        setCopyStatus('sending')
+        try {
+            const canvas = canvasRef.current;
+            if (!canvas) throw new Error("Canvas not ready");
+
+            const blob = await getExportBlob();
+
+            // 手动复制时，如果不曾在此会话中复制过 Prompt，就带上。
+            // 且不受是否已经 Add to Chat 的影响。
+            const shouldIncludeText = !hasCopiedPrompt && !hasSentPrompt;
+            const items: Record<string, Blob> = { 'image/png': blob };
+
+            if (shouldIncludeText) {
+                items['text/plain'] = new Blob([TEXT_PROMPT], { type: 'text/plain' });
+            }
+
+            await navigator.clipboard.write([
+                new ClipboardItem(items)
+            ]);
+
+            if (shouldIncludeText) {
+                setHasCopiedPrompt(true);
+            }
+
+            setCopyStatus('success');
+            setTimeout(() => setCopyStatus('idle'), 2000);
+        } catch (error) {
+            console.error("Failed to copy to clipboard:", error);
+            setCopyStatus('error');
+            setTimeout(() => setCopyStatus('idle'), 3000);
+        }
+    }
+
+    const cursorMap: Record<ToolId, string> = { draw: 'crosshair', rect: 'crosshair', comment: 'cell', text: 'text', crop: 'crosshair' }
 
     // show=true → 完全可见；false → 透明+下移（入场前 or 退场中）
     const show = mounted && !isClosing
     const enterT = 'opacity 0.28s cubic-bezier(0,0,0.2,1), transform 0.34s cubic-bezier(0,0,0.2,1)'
-    const exitT  = 'opacity 0.22s cubic-bezier(0.4,0,1,1), transform 0.22s cubic-bezier(0.4,0,1,1)'
+    const exitT = 'opacity 0.22s cubic-bezier(0.4,0,1,1), transform 0.22s cubic-bezier(0.4,0,1,1)'
 
     return (
         <div style={{
@@ -313,7 +581,8 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
             opacity: show ? 1 : 0,
             transition: isClosing ? 'opacity 0.26s ease-in' : 'opacity 0.24s ease-out',
         }}>
-            <style dangerouslySetInnerHTML={{ __html: `
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 @keyframes tooltipIn {
                     from { opacity: 0; transform: translateX(-50%) translateY(3px) scale(0.97); }
                     to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
@@ -329,6 +598,18 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
                 }}
                 onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} />
 
+            {/* 裁剪遮罩层 */}
+            {cropRect && (
+                <CropOverlay
+                    rect={cropRect}
+                    scale={scaleRef.current}
+                    isCropActive={isCropActive}
+                    isCropSelected={isCropSelected}
+                    isHoveringHandle={isHoveringHandle}
+                    isCurrentTool={tool === 'crop'}
+                />
+            )}
+
             {/* ── Toolbar ── 纯黑底，icon-only */}
             <div style={{
                 position: 'fixed', bottom: 28, left: '50%',
@@ -337,13 +618,20 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
                 boxShadow: '0 4px 24px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.06) inset',
                 border: '1px solid rgba(255,255,255,0.15)', userSelect: 'none',
                 opacity: show ? 1 : 0,
+                zIndex: 100,
                 transform: `translateX(-50%) translateY(${show ? 0 : 28}px)`,
                 transition: isClosing ? exitT : enterT,
             }}>
                 {/* 工具按钮 */}
                 {TOOLS.map(({ id, label, shortcut, Icon }) => (
-                    <IconBtn key={id} active={tool === id} onClick={() => changeTool(id)} Icon={Icon}
-                        label={label} shortcut={shortcut} />
+                    <IconBtn
+                        key={id}
+                        active={id === 'crop' ? isCropActive : tool === id}
+                        onClick={() => changeTool(id)}
+                        Icon={Icon}
+                        label={label}
+                        shortcut={shortcut}
+                    />
                 ))}
 
                 <ColorPicker activeColor={activeColor} onChange={setActiveColor} />
@@ -352,6 +640,7 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
                 <IconBtn Icon={Undo2} active={false} onClick={undo} label="Undo" shortcut="⌘Z" />
                 <IconBtn Icon={Eraser} active={false} onClick={clearAll} danger label="Clear all" />
                 <Sep />
+                <CopyButton status={copyStatus} onClick={copyToClipboard} />
                 <SendButton status={sendStatus} onClick={sendToIDE} />
                 <CloseBtn onClick={handleClose} />
             </div>
@@ -360,10 +649,89 @@ export function AnnotatorApp({ imgDataUrl, onClose }: AnnotatorAppProps) {
             {commentState.visible && (
                 <CommentInput x={commentState.x} y={commentState.y} mode={commentState.mode}
                     value={commentText} onChange={setCommentText}
-                    onConfirm={submitComment} onCancel={() => { closeComment(); restoreLastState() }} />
+                    onConfirm={submitComment} onCancel={undo} />
+            )}
+
+            {/* 引导弹窗 */}
+            {showGuide && (
+                <GuideModal onClose={() => setShowGuide(false)} />
             )}
         </div>
     )
+}
+
+// ── 引导弹窗组件 ──────────────────────────────────────────────
+function GuideModal({ onClose }: { onClose: () => void }) {
+    return (
+        <div style={{
+            position: 'fixed', inset: 0, zIndex: 2147483647,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+            animation: 'opacityIn 0.2s ease-out'
+        }}>
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                @keyframes opacityIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes modalUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+            `}} />
+            <div style={{
+                width: 380, background: '#111', borderRadius: 16,
+                padding: '28px 24px', position: 'relative',
+                border: '1px solid rgba(255,255,255,0.12)',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+                animation: 'modalUp 0.3s cubic-bezier(0,0,0.2,1) forwards'
+            }}>
+                <button onClick={onClose} style={{
+                    position: 'absolute', right: 16, top: 16, background: 'none', border: 'none',
+                    cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: 4
+                }}>
+                    <X size={20} />
+                </button>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <img src="https://antigravity.ai/favicon.ico" style={{ width: 22, height: 22 }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                            <Send size={18} color="#fff" style={{ pointerEvents: 'none' }} />
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: 18, color: '#fff', fontWeight: 600 }}>安装 Antigravity</h3>
+                    </div>
+
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+                        检测到您尚未在 Antigravity 中安装对应的插件，或者相关服务未启动。请按照以下步骤操作：
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>1</div>
+                            <div style={{ fontSize: 13, color: '#eee' }}>
+                                请先前往 <a href="https://antigravity.ai" target="_blank" style={{ color: '#aaa', textDecoration: 'underline' }}>Antigravity 官网</a> 或 VS Code 插件市场。
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>2</div>
+                            <div style={{ fontSize: 13, color: '#eee' }}>
+                                直接搜索关键词 <b>"Antigravity"</b> 进行下载安装。
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>3</div>
+                            <div style={{ fontSize: 13, color: '#eee' }}>
+                                安装完成后，<b>启动客户端</b> 并点击标注工具上的“Add”按钮即可自动发送。
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onClick={onClose} style={{
+                        marginTop: 12, padding: '10px', borderRadius: 10, background: '#fff', color: '#000',
+                        border: 'none', fontWeight: 600, fontSize: 14, cursor: 'pointer'
+                    }}>
+                        我已安装
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 // ── Icon-only 工具按钮（内联 Tooltip，不使用 Portal，避免跨 Shadow DOM 崩溃）──
@@ -383,7 +751,7 @@ function IconBtn({ Icon, active, onClick, danger = false, label, shortcut }: {
             style={{
                 position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 40, height: 40, borderRadius: 10,
-                border: 'none', zIndex: hov ? 200 : 'auto' as any,
+                border: 'none', zIndex: hov ? 200 : 'auto',
                 background: active
                     ? 'rgba(255,255,255,0.22)'
                     : (danger && hov) ? 'rgba(239,68,68,0.15)' : hov ? 'rgba(255,255,255,0.15)' : 'transparent',
@@ -464,7 +832,7 @@ function CloseBtn({ onClick }: { onClick: () => void }) {
             onMouseDown={() => setPressed(true)}
             onMouseUp={() => setPressed(false)}
             style={{
-                position: 'relative', zIndex: hov ? 200 : 'auto' as any,
+                position: 'relative', zIndex: hov ? 200 : 'auto',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 40, height: 40, borderRadius: 10,
                 border: 'none',
@@ -486,6 +854,75 @@ function CloseBtn({ onClick }: { onClick: () => void }) {
     )
 }
 
+// ── 复制按钮 ─────────────────────────────────────────────────
+function CopyButton({ status, onClick }: { status: SendStatus; onClick: () => void }) {
+    const disabled = status === 'sending' || status === 'success'
+    const [pressed, setPressed] = useState(false)
+    const [hov, setHov] = useState(false)
+    const bgMap: Record<SendStatus, string> = {
+        idle: hov ? 'rgba(255,255,255,0.15)' : 'transparent', sending: 'rgba(255,255,255,0.05)',
+        success: 'rgba(255,255,255,0.12)', error: 'rgba(248,113,113,0.15)',
+    }
+    const colorMap: Record<SendStatus, string> = {
+        idle: '#ffffff', sending: 'rgba(255,255,255,0.4)',
+        success: '#ffffff', error: '#f87171',
+    }
+
+    return (
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            onMouseOver={() => setHov(true)}
+            onMouseOut={() => { setHov(false); setPressed(false) }}
+            onMouseDown={() => !disabled && setPressed(true)}
+            onMouseUp={() => setPressed(false)}
+            style={{
+                position: 'relative', zIndex: hov ? 200 : 'auto',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 40, height: 40, borderRadius: 10,
+                background: bgMap[status], border: 'none',
+                cursor: disabled && status !== 'success' ? 'default' : 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                opacity: (disabled && status === 'sending') ? 0.7 : 1,
+                transform: pressed ? 'scale(0.95)' : 'scale(1)',
+                outline: 'none',
+            }}
+        >
+            <div style={{ position: 'relative', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{
+                    position: 'absolute', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transitionDelay: status === 'idle' ? '0.1s' : '0s',
+                    opacity: status === 'idle' ? (hov ? 1 : 0.65) : 0,
+                    transform: status === 'idle' ? 'scale(1)' : 'scale(0.8)',
+                    pointerEvents: 'none', display: 'flex'
+                }}>
+                    <Copy size={20} strokeWidth={1.6} color={colorMap[status]} />
+                </div>
+                <div style={{
+                    position: 'absolute', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transitionDelay: status === 'sending' ? '0.1s' : '0s',
+                    opacity: status === 'sending' ? 1 : 0,
+                    transform: status === 'sending' ? 'scale(1)' : 'scale(0.5)',
+                    pointerEvents: 'none', display: 'flex'
+                }}>
+                    <Loader2 size={16} color={colorMap[status]} style={{ animation: status === 'sending' ? 'spin 1s linear infinite' : 'none' }} />
+                </div>
+                <div style={{
+                    position: 'absolute', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transitionDelay: status === 'success' ? '0.1s' : '0s',
+                    opacity: status === 'success' ? 1 : 0,
+                    transform: status === 'success' ? 'scale(1)' : 'scale(0.8)',
+                    pointerEvents: 'none', display: 'flex'
+                }}>
+                    <Check size={20} strokeWidth={1.6} color={colorMap[status]} />
+                </div>
+            </div>
+
+            {hov && !pressed && status === 'idle' && <InlineTooltip label="Copy to clipboard" />}
+        </button>
+    )
+}
+
 // ── 发送按钮 ─────────────────────────────────────────────────
 function SendButton({ status, onClick }: { status: SendStatus; onClick: () => void }) {
     const disabled = status === 'sending' || status === 'success'
@@ -496,7 +933,7 @@ function SendButton({ status, onClick }: { status: SendStatus; onClick: () => vo
         success: 'rgba(255,255,255,0.12)', error: 'rgba(248,113,113,0.15)',
     }
     const labelMap: Record<SendStatus, string> = {
-        idle: 'Add to Chat', sending: 'Sending…', success: 'Added', error: 'Error',
+        idle: 'Add to Antigravity', sending: 'Sending…', success: 'Added', error: 'Error',
     }
     const colorMap: Record<SendStatus, string> = {
         idle: 'rgba(255,255,255,0.8)', sending: 'rgba(255,255,255,0.4)',
@@ -511,9 +948,9 @@ function SendButton({ status, onClick }: { status: SendStatus; onClick: () => vo
             onMouseDown={() => !disabled && setPressed(true)}
             onMouseUp={() => setPressed(false)}
             style={{
-                position: 'relative', zIndex: hov ? 200 : 'auto' as any,
+                position: 'relative', zIndex: hov ? 200 : 'auto',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '0 12px', height: 40, minWidth: 130, borderRadius: 8,
+                padding: '0 12px', height: 40, width: 164, borderRadius: 8,
                 background: bgMap[status], border: 'none',
                 cursor: disabled && status !== 'success' ? 'default' : 'pointer',
                 color: colorMap[status],
@@ -523,15 +960,36 @@ function SendButton({ status, onClick }: { status: SendStatus; onClick: () => vo
                 outline: 'none',
             }}
         >
-            {status === 'sending' && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
-            {status === 'success' && <Check size={18} strokeWidth={2.5} />}
-            {status === 'idle' && (
-                <Send size={20} strokeWidth={1.5}
-                    color="#ffffff"
-                    style={{ opacity: 0.9 }}
-                />
-            )}
-            {labelMap[status]}
+            <div style={{
+                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', pointerEvents: 'none',
+                transitionDelay: status === 'idle' ? '0.1s' : '0s',
+                opacity: status === 'idle' ? 1 : 0, transform: status === 'idle' ? 'scale(1)' : 'scale(0.95)'
+            }}>
+                <Send size={20} strokeWidth={1.5} color="#ffffff" style={{ opacity: 0.9 }} />
+                <span>{labelMap['idle']}</span>
+            </div>
+
+            <div style={{
+                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', pointerEvents: 'none',
+                transitionDelay: status === 'sending' ? '0.1s' : '0s',
+                opacity: status === 'sending' ? 1 : 0, transform: status === 'sending' ? 'scale(1)' : 'scale(0.95)'
+            }}>
+                <Loader2 size={14} style={{ animation: status === 'sending' ? 'spin 1s linear infinite' : 'none' }} />
+                <span>{labelMap['sending']}</span>
+            </div>
+
+            <div style={{
+                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', pointerEvents: 'none',
+                transitionDelay: status === 'success' ? '0.1s' : '0s',
+                opacity: status === 'success' ? 1 : 0, transform: status === 'success' ? 'scale(1)' : 'scale(0.95)'
+            }}>
+                <Check size={18} strokeWidth={1.6} />
+                <span>{labelMap['success']}</span>
+            </div>
+
             {hov && !pressed && status === 'idle' && <InlineTooltip label="Send to Antigravity" />}
         </button>
     )
@@ -695,3 +1153,154 @@ function ColorSwatch({ color, active, onClick }: { color: string; active: boolea
     )
 }
 
+// ── 裁剪遮罩组件 ──────────────────────────────────────────────
+function CropOverlay({ rect, scale, isCropActive, isCropSelected, isHoveringHandle, isCurrentTool }: {
+    rect: { x: number, y: number, w: number, h: number },
+    scale: number,
+    isCropActive: boolean,
+    isCropSelected: boolean,
+    isHoveringHandle: boolean,
+    isCurrentTool: boolean
+}) {
+    const { x: cx, y: cy, w: cw, h: ch } = rect
+    const x = cx * scale
+    const y = cy * scale
+    const w = cw * scale
+    const h = ch * scale
+
+    // 把手显示的条件：常驻选中 OR 鼠标悬停边缘
+    const showHandles = isCropSelected || isHoveringHandle
+    // 边框亮起的条件：当前操作工具是裁剪 OR 已经选中把手 OR 悬停边缘
+    const highlightBorder = isCurrentTool || isCropSelected || isHoveringHandle
+
+    return (
+        <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5,
+        }}>
+            <div style={{
+                position: 'absolute', inset: 0,
+                background: 'rgba(0,0,0,0.88)',
+                clipPath: `polygon(
+                    0% 0%, 0% 100%, ${x}px 100%, 
+                    ${x}px ${y}px, ${x + w}px ${y}px, ${x + w}px ${y + h}px, ${x}px ${y + h}px, ${x}px 100%, 
+                    100% 100%, 100% 0%
+                )`
+            }} />
+
+            <div style={{
+                position: 'absolute', left: x, top: y, width: w, height: h,
+                boxSizing: 'border-box',
+                pointerEvents: 'none',
+                border: highlightBorder ? '1px dashed rgba(255,255,255,0.45)' : '1px dashed rgba(255,255,255,0.15)'
+            }}>
+                {isCropActive && showHandles && w >= 64 && h >= 64 && (
+                    <>
+                        <CropHandle pos="nw" />
+                        <CropHandle pos="ne" />
+                        <CropHandle pos="sw" />
+                        <CropHandle pos="se" />
+
+                        {/* 宽度足够时显示南北手柄 */}
+                        {w > 100 && (
+                            <>
+                                <CropHandle pos="n" />
+                                <CropHandle pos="s" />
+                            </>
+                        )}
+                        {/* 高度足够时显示东西手柄 */}
+                        {h > 100 && (
+                            <>
+                                <CropHandle pos="w" />
+                                <CropHandle pos="e" />
+                            </>
+                        )}
+                    </>
+                )}
+            </div>
+        </div>
+    )
+}
+
+function CropHandle({ pos }: { pos: string }) {
+    const isCorner = pos.length === 2
+    const color = '#000000'
+    const borderColor = '#FFFFFF' // 恢复纯白增强对比度
+    const thickness = 4
+    const length = isCorner ? 20 : 26
+    const strokeWidth = 1 // 恢复 1px
+
+    const pad = 2
+    const svgSize = length + pad * 2
+
+    const halfT = thickness / 2
+    const halfS = svgSize / 2
+
+    const containerStyle: React.CSSProperties = {
+        position: 'absolute',
+        width: svgSize,
+        height: svgSize,
+        zIndex: 10,
+        pointerEvents: 'none',
+        overflow: 'visible'
+    }
+
+    // 严谨的定位逻辑：统一使用 left/top 进行定位，消除边界计算误差
+    // Y轴定位
+    if (pos.includes('n')) {
+        containerStyle.top = -halfT - pad
+    } else if (pos.includes('s')) {
+        // 如果是角把手且坐标在底部 (s)，顶点在 SVG 的 length 处
+        // 我们要让这个顶点对齐 H + halfT
+        if (isCorner) {
+            containerStyle.top = `calc(100% + ${halfT - length - pad}px)`
+        } else {
+            containerStyle.top = `calc(100% - ${halfT + pad}px)`
+        }
+    } else {
+        containerStyle.top = `calc(50% - ${halfS}px)`
+    }
+
+    // X轴定位
+    if (pos.includes('w')) {
+        containerStyle.left = -halfT - pad
+    } else if (pos.includes('e')) {
+        // 如果是角把手且坐标在右侧 (e)，顶点在 SVG 的 length 处
+        if (isCorner) {
+            containerStyle.left = `calc(100% + ${halfT - length - pad}px)`
+        } else {
+            containerStyle.left = `calc(100% - ${halfT + pad}px)`
+        }
+    } else {
+        containerStyle.left = `calc(50% - ${halfS}px)`
+    }
+
+    return (
+        <svg style={containerStyle} width={svgSize} height={svgSize} viewBox={`-${pad} -${pad} ${svgSize} ${svgSize}`}>
+            {isCorner ? (
+                // L 型拐角：使用一条平滑的路径，消除重叠描边
+                <path
+                    d={
+                        pos === 'nw' ? `M ${length},${thickness} H ${thickness} V ${length} H 0 V 0 H ${length} Z` :
+                            pos === 'ne' ? `M 0,${thickness} H ${length - thickness} V ${length} H ${length} V 0 H 0 Z` :
+                                pos === 'sw' ? `M ${length},${length - thickness} H ${thickness} V 0 H 0 V ${length} H ${length} Z` :
+                        /* se */ `M 0,${length - thickness} H ${length - thickness} V 0 H ${length} V ${length} H 0 Z`
+                    }
+                    fill={color}
+                    stroke={borderColor}
+                    strokeWidth={strokeWidth}
+                    strokeLinejoin="miter"
+                />
+            ) : (
+                // 矩形边条
+                <rect
+                    x={0} y={0}
+                    width={pos === 'n' || pos === 's' ? length : thickness}
+                    height={pos === 'n' || pos === 's' ? thickness : length}
+                    fill={color}
+                    stroke={borderColor}
+                    strokeWidth={strokeWidth}
+                />
+            )}
+        </svg>
+    )
+}

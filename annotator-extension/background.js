@@ -72,26 +72,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'SEND_TO_IDE') {
-    const { payload } = request;
+    // 方案 1: Deep Link. 扩展只负责接收前台的发起请求(如果需要跨权限剪贴板，可以在这里做，
+    // 但是在这个场景下，前台 Content Script 可以直接操作 clipboard && window.open)
+    // 所以这里直接返回成功即可，如果未来有额外后台处理，可加这里
+    sendResponse({ success: true });
+    return false;
+  }
 
-    fetch('http://localhost:3001/api/screenshot', {
+  if (request.action === 'TRIGGER_LOCAL_DAEMON') {
+    fetch('http://localhost:3001/api/send-screenshot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ source: 'extension', url: request.url, includePrompt: request.includePrompt !== false }),
     })
-      .then(res => {
-        if (res.ok) {
-          sendResponse({ success: true });
-        } else {
-          sendResponse({ success: false, error: 'HTTP ' + res.status });
-        }
+      .then(resp => {
+        if (!resp.ok) throw new Error('Daemon returned error');
+        sendResponse({ success: true });
       })
       .catch(err => {
-        console.error("Background fetch error:", err);
-        sendResponse({ success: false, error: err.toString() });
+        console.warn("Daemon fetch failed", err);
+        sendResponse({ success: false, error: err.message });
       });
-
-    // 必须返回 true 表示会异步发送 sendResponse
-    return true;
+    return true; // Keep message channel open for async response
   }
 });
