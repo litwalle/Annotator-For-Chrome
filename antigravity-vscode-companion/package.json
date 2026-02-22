@@ -1,0 +1,43 @@
+{
+    "name": "antigravity-companion",
+    "displayName": "Annotator - for VS Code",
+    "description": "Companion extension for Antigravity browser annotator. Enables seamless image and text injection from browser to IDE.",
+    "version": "1.0.0",
+    "icon": "icon.png",
+    "publisher": "antigravity",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/yourusername/antigravity-vscode-companion"
+    },
+    "license": "MIT",
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "antigravity-companion.restartServer",
+                "title": "Restart Antigravity Companion Server"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run package",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "package": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node"
+    },
+    "devDependencies": {
+        "@types/node": "20.x",
+        "@types/vscode": "^1.80.0",
+        "esbuild": "^0.20.0",
+        "typescript": "^5.3.3"
+    }
+}
