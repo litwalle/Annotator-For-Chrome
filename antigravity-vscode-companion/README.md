@@ -11,9 +11,20 @@ This is the companion extension for Antigravity. Because modern browsers restric
 To enable seamless image and text injection from your browser into the Antigravity app, please follow these steps:
 
 ### Step 1: Install the Chrome Extension First
-1. Open the [Chrome Web Store](https://chrome.google.com/webstore) in your Google Chrome or Edge browser.
-2. Search for and install the **"Annotator - for Chrome"** extension.
-3. **Pin** the extension to your browser toolbar for quick access.
+
+> ⏳ **Note:** The Chrome extension is currently **under review** on the Chrome Web Store and is not yet publicly searchable.
+> In the meantime, you can install it manually in under a minute using the steps below.
+
+**Install manually via GitHub (available now):**
+1. Visit the [GitHub repository](https://github.com/litwalle/Antigravity-Annotator-1.0) and download **`Annotator-Chrome-Extension-1.0.6.zip`** from the root of the repo.
+2. **Unzip** the downloaded file to a local folder.
+3. Open Chrome and go to `chrome://extensions/`
+4. Enable **Developer Mode** (toggle in the top-right corner).
+5. Click **"Load unpacked"** and select the unzipped folder.
+6. **Pin** the Annotator icon to your Chrome toolbar for quick access.
+
+**Install from Chrome Web Store (coming soon):**
+Once the review is complete, you will be able to search for **"Annotator - for Chrome"** directly in the Chrome Web Store and install it with one click.
 
 ### Step 2: Install this Companion Extension in Antigravity
 1. Open **Antigravity**.
@@ -35,9 +46,9 @@ The complete communication bridge is now established.
 ## ⚠️ Important Precautions & Usage Tips
 
 * **macOS Only**: This specific routing mechanism relies on AppleScript (`tell application "Antigravity"`), which means it is designed specifically for macOS users running the Antigravity desktop client.
-* **Keep your IDE open**: The local receiver server (`http://localhost:3001`) only runs when your IDE is open. If you close your IDE, the browser extension will temporarily lose its bridge to the Antigravity app.
+* **Keep Antigravity open**: The local receiver server (`http://localhost:3001`) only runs while Antigravity is open. If you quit Antigravity, the browser extension will temporarily lose its bridge.
 * **Server Status**: If for any reason the connection drops, you can restart the local server manually:
-  * Open the Command Palette in your IDE (`Cmd+Shift+P`).
+  * Open the Command Palette in Antigravity (`Cmd+Shift+P`).
   * Type and execute: `Restart Annotator Server`.
 
 ---

@@ -2,7 +2,7 @@
     "name": "antigravity",
     "displayName": "Annotator for Antigravity",
     "description": "Companion extension for Antigravity browser annotator. Enables seamless image and text injection from browser directly into Antigravity.",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "icon": "icon.png",
     "publisher": "litwalle",
     "repository": {
