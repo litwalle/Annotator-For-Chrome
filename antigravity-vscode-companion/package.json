@@ -1,5 +1,5 @@
 {
-    "name": "antigravity-companion",
+    "name": "annotator-for-vscode",
     "displayName": "Annotator - for VS Code",
     "description": "Companion extension for Antigravity browser annotator. Enables seamless image and text injection from browser to IDE.",
     "version": "1.0.0",
@@ -23,8 +23,8 @@
     "contributes": {
         "commands": [
             {
-                "command": "antigravity-companion.restartServer",
-                "title": "Restart Antigravity Companion Server"
+                "command": "annotator-for-vscode.restartServer",
+                "title": "Restart Annotator Server"
             }
         ]
     },
