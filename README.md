@@ -1,6 +1,6 @@
 # Antigravity Annotator
 
-> A Chrome extension for capturing, annotating, and sharing webpage screenshots with your IDE.
+> A Chrome extension for capturing, annotating, and sharing webpage screenshots with Antigravity.
 
 ![Chrome Extension](https://img.shields.io/badge/Platform-Chrome%20Extension-4285F4?logo=googlechrome&logoColor=white)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-34A853)
@@ -10,7 +10,59 @@
 
 ## Overview
 
-Antigravity Annotator is a browser extension that lets you capture a full screenshot of the current webpage, annotate it with drawing tools, highlights, comments, and text, then send the result directly to your IDE. Built for designers and developers who need a fast feedback loop between the browser and their development environment.
+Antigravity Annotator is a browser extension that lets you capture a full screenshot of the current webpage, annotate it with drawing tools, highlights, comments, and text, then inject the result directly into **Antigravity** for AI-assisted development. Built for developers who need a fast feedback loop between the browser and Antigravity.
+
+---
+
+## 📦 Download & Installation
+
+### Step 1 — Install the Chrome Extension
+
+You can install the Chrome extension in two ways:
+
+#### Option A: Direct Download (Recommended for most users)
+
+1. **Download** the latest pre-built package from this repository:
+   👉 [`Annotator-Chrome-Extension-1.0.6.zip`](./Annotator-Chrome-Extension-1.0.6.zip)
+
+2. **Unzip** the downloaded file to a folder on your computer.
+
+3. Open Chrome and go to `chrome://extensions/`
+
+4. Enable **Developer Mode** by toggling the switch in the top-right corner.
+
+5. Click **"Load unpacked"** and select the unzipped folder.
+
+6. The **Annotator** icon will appear in your Chrome toolbar. Pin it for easy access.
+
+#### Option B: From Source
+
+```bash
+git clone https://github.com/litwalle/Antigravity-Annotator-1.0.git
+cd annotator-react
+npm install
+npm run build
+```
+
+Then load the `annotator-extension/` folder via **Load unpacked** as described above.
+
+---
+
+### Step 2 — Install the Antigravity Companion Extension
+
+To enable image injection from the browser into Antigravity, you also need to install the companion extension inside **Antigravity**.
+
+✅ **This extension is now available on the VS Code Marketplace:**
+
+> Search for **"Annotator for Antigravity"** in Antigravity's Extensions panel, or install it directly from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=litwalle.antigravity).
+
+1. Open **Antigravity**.
+2. Go to the **Extensions** panel (`Cmd+Shift+X`).
+3. Search for **`Annotator for Antigravity`**.
+4. Click **Install**.
+5. *(Optional)* Reload the Antigravity window to ensure the local bridge server starts correctly.
+
+---
 
 ## Features
 
@@ -21,10 +73,12 @@ Antigravity Annotator is a browser extension that lets you capture a full screen
 - **Comments** — Create comment boxes with pointer lines for contextual feedback
 - **Text Annotations** — Place text directly on the screenshot
 - **Image & Prompt Integration** — Seamlessly copy annotated images and generated context prompts
-- **Send to IDE** — Push annotated screenshots to a local API endpoint for IDE integration
+- **Send to Antigravity** — Push annotated screenshots directly into Antigravity chat
 - **Keyboard Shortcuts** — Full shortcut support for fast workflows
 - **Retina Support** — Full-resolution rendering on high-DPI displays
 - **Isolated Rendering** — Shadow DOM ensures zero style conflicts with the host page
+
+---
 
 ## Keyboard Shortcuts
 
@@ -41,6 +95,8 @@ Antigravity Annotator is a browser extension that lets you capture a full screen
 
 8 neon colors available: Fluorescent Yellow, Green, Cyan, Blue, Purple, Pink, Red, and Orange.
 
+---
+
 ## Tech Stack
 
 | Layer | Technologies |
@@ -50,63 +106,30 @@ Antigravity Annotator is a browser extension that lets you capture a full screen
 | Build Tool | Vite 7 |
 | Extension | Chrome Manifest V3, Shadow DOM, Canvas API |
 
+---
+
 ## Project Structure
 
 ```
-├── annotator-extension/    # Packaged Chrome extension (ready to install)
+├── Annotator-Chrome-Extension-1.0.6.zip   # Pre-built Chrome extension (ready to install)
+├── annotator-extension/    # Chrome extension source files
 │   ├── manifest.json       # Extension manifest (V3)
 │   ├── background.js       # Service worker for screenshot capture
 │   ├── content.js          # Compiled content script (React app)
 │   ├── content.css         # Content script styles
 │   └── icons/              # Extension icons
-└── annotator-react/        # React source code
-    ├── src/
-    │   ├── AnnotatorApp.tsx    # Main annotation UI component
-    │   ├── content.tsx         # Content script entry point
-    │   └── components/ui/      # Reusable UI components
-    ├── vite.config.ts
-    ├── package.json
-    └── tsconfig.json
+├── annotator-react/        # React source code
+│   ├── src/
+│   │   ├── AnnotatorApp.tsx    # Main annotation UI component
+│   │   ├── content.tsx         # Content script entry point
+│   │   └── components/ui/      # Reusable UI components
+│   ├── vite.config.ts
+│   ├── package.json
+│   └── tsconfig.json
+└── antigravity-vscode-companion/   # Antigravity companion extension source
 ```
 
-## Installation
-
-### From Source
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/your-username/antigravity-annotator.git
-   ```
-
-2. Build the React content script:
-   ```bash
-   cd annotator-react
-   npm install
-   npm run build
-   ```
-
-3. Load the extension in Chrome:
-   - Navigate to `chrome://extensions/`
-   - Enable **Developer mode**
-   - Click **Load unpacked**
-   - Select the `annotator-extension/` directory
-
-### Pre-built
-
-1. Download or clone this repository
-2. Open `chrome://extensions/` and enable **Developer mode**
-3. Click **Load unpacked** and select the `annotator-extension/` directory
-
-## Usage
-
-1. Navigate to any webpage you want to annotate
-2. Click the **Antigravity Annotator** icon in the Chrome toolbar
-3. The annotator overlay will appear with a screenshot of the current page
-4. Use the toolbar to select drawing tools and colors
-5. Annotate the screenshot as needed
-6. Click **Send** to push the annotated image to your IDE
-
-> The extension sends annotated images to `http://localhost:3001/api/screenshot`. Make sure the receiving server is running in your IDE environment.
+---
 
 ## Development
 
@@ -121,12 +144,11 @@ npm run dev
 
 # Build for production
 npm run build
-
-# Lint
-npm run lint
 ```
 
 After building, the compiled output is placed in `annotator-extension/` and can be loaded directly as an unpacked Chrome extension.
+
+---
 
 ## License
 
