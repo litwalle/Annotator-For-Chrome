@@ -115,7 +115,11 @@ export function useCanvasDrawing(imgDataUrl: string, activeColor: string) {
 
     // ── 评论 ──
     function openComment(x: number, y: number) {
-        setCommentState({ visible: true, x: Math.min(x + 12, window.innerWidth - 264), y: Math.min(y, window.innerHeight - 160), mode: 'comment' })
+        const toolbarH = 80 // 工具栏高度 + bottom 偏移
+        const popH = 160  // CommentInput 大约高度
+        const gap = 8      // 与工具栏之间的间距
+        const safeY = Math.min(y, window.innerHeight - popH - toolbarH - gap)
+        setCommentState({ visible: true, x: Math.min(x + 12, window.innerWidth - 264), y: Math.max(8, safeY), mode: 'comment' })
         setCommentText('')
     }
 

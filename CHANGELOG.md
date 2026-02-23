@@ -4,6 +4,15 @@ All notable changes to Antigravity Annotator will be documented in this file.
 
 ---
 
+## [1.2.1] — 2026-02-23
+
+### Improvements
+
+- **Draggable toolbar** — Toolbar now has a drag handle (grip icon on the left). Drag it to reposition the toolbar anywhere on screen. Double-click the handle to reset to the default bottom-center position.
+- **Comment input avoidance** — Comment popup now maintains an 8px gap from the toolbar when avoiding overlap, instead of sitting flush against it.
+
+---
+
 ## [1.2.0] — 2026-02-23
 
 ### Major Release: Object Model Architecture & New Tools

@@ -25,7 +25,7 @@ You can install the Chrome extension in **two ways**:
 #### Option A: Direct Download (Recommended)
 
 1. **Download** the latest pre-built package from this repository:
-   [`Annotator-Chrome-Extension-1.2.0.zip`](./Annotator-Chrome-Extension-1.2.0.zip)
+   [`Annotator-Chrome-Extension-1.2.1.zip`](./Annotator-Chrome-Extension-1.2.1.zip)
 
 2. **Unzip** the downloaded file to a local folder on your computer.
 
@@ -132,7 +132,7 @@ To enable image injection from the browser into Antigravity, you also need to in
 ## Project Structure
 
 ```
-├── Annotator-Chrome-Extension-1.2.0.zip   # Pre-built Chrome extension (ready to install)
+├── Annotator-Chrome-Extension-1.2.1.zip   # Pre-built Chrome extension (ready to install)
 ├── preview.png                             # Preview screenshot
 ├── CHANGELOG.md                            # Version history
 ├── annotator-extension/    # Chrome extension source files
